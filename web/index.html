@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#ffffff" />
+<title>长辈翻译</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<style>
+  :root{
+    --bg:#fff; --text:#1a1a1a; --sub:#5a5a5a; --card:#f4f6f8;
+    --listen:#1b8a3a; --speak:#1361c2; --photo:#d5670b; --sos:#c0271a; --on:#fff;
+    --fz-title:30px; --fz-hint:24px; --fz-btn:28px; --fz-result:40px; --fz-result-big:54px; --fz-small:20px;
+    --radius:24px; --gap:16px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--text); font-size:var(--fz-hint);}
+  .app{max-width:520px; margin:0 auto; min-height:100%; padding:20px; display:flex; flex-direction:column; gap:var(--gap);}
+  .hidden{display:none !important;}
+  button{font-family:inherit; border:none; border-radius:var(--radius); cursor:pointer;}
+  .topbar{width:100%; height:84px; font-size:var(--fz-btn); color:var(--on); font-weight:700;}
+  .hint{font-size:var(--fz-hint); color:var(--sub); text-align:center;}
+  /* 首页大卡片 */
+  .card{width:100%; height:190px; border-radius:var(--radius); color:var(--on);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; font-weight:700;}
+  .card .ico{font-size:64px; line-height:1;}
+  .card .ttl{font-size:var(--fz-title);}
+  .card .sub{font-size:var(--fz-hint); font-weight:400;}
+  .sos-entry{width:100%; height:84px; background:var(--sos); color:var(--on); font-size:var(--fz-btn); font-weight:700;}
+  /* 通用页 */
+  .page{flex:1; display:flex; flex-direction:column; gap:var(--gap);}
+  .result{flex:1; overflow:auto; font-size:var(--fz-result); font-weight:700; line-height:1.3;}
+  .result.big{font-size:var(--fz-result-big);}
+  .small{font-size:var(--fz-small); color:var(--sub);}
+  .mic{width:160px; height:160px; border-radius:50%; color:var(--on); font-size:var(--fz-btn); align-self:center;}
+  .mic.rec{background:var(--sos) !important; animation:pulse 1s infinite;}
+  @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+  .row{display:flex; gap:var(--gap);} .row>button{flex:1; height:84px; font-size:var(--fz-btn);}
+  .act{width:100%; height:84px; font-size:var(--fz-btn); color:var(--on); font-weight:700;}
+  .ghost{background:var(--card); color:var(--text);}
+  .stage{flex:1; background:var(--card); border-radius:var(--radius); overflow:hidden; display:flex; align-items:center; justify-content:center;}
+  .stage video,.stage img{width:100%; height:100%; object-fit:cover;}
+  /* 应急 */
+  .contact{background:var(--sos); color:var(--on); border-radius:var(--radius); padding:16px; display:flex; flex-direction:column; gap:8px; align-items:center;}
+  .contact .nm{font-size:var(--fz-title); font-weight:700;} .contact .ph{font-size:var(--fz-hint);}
+  .phrase{width:100%; padding:18px; background:var(--card); border-radius:var(--radius); font-size:var(--fz-btn); text-align:left; color:var(--text);}
+  /* 全屏给对方看 */
+  .fs{position:fixed; inset:0; background:#000; color:#fff; display:flex; flex-direction:column; padding:20px; gap:var(--gap); z-index:50;}
+  .fs .big{flex:1; display:flex; align-items:center; justify-content:center; text-align:center; font-size:var(--fz-result-big); font-weight:700;}
+  .fs .zh{font-size:var(--fz-hint); color:#ccc; text-align:center;}
+  .banner{font-size:15px; color:#8a5a00; background:#fff7e6; border:1px solid #ffe0a3; border-radius:12px; padding:10px 12px;}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="fs hidden" id="fs">
+  <div class="zh" id="fsZh"></div>
+  <div class="big" id="fsEn"></div>
+  <button class="act" style="background:var(--speak)" onclick="closeFs()">收起</button>
+</div>
+
+<script>
+/* ============================================================
+   长辈翻译 · 网页版（演示/验证用，可离线打开）
+   - 应急用语 + 朗读：完全离线（浏览器 TTS）
+   - 听/说：浏览器 Web Speech API（需 HTTPS 或 localhost；Chrome/Edge 最佳）
+   - 拍：getUserMedia 相机 或 选图片（需 HTTPS/localhost）
+   - 翻译/OCR：优先调后端网关；未配置时用内置演示词典兜底，保证可点可看
+   ============================================================ */
+
+/* ---------- 配置 ---------- */
+const GATEWAY_BASE = ""; // 部署后填：如 "https://gateway.example.com"，留空则走演示词典
+
+/* ---------- 家人紧急联系人（子女填写） ---------- */
+const CONTACT = { name: "我的女儿", phone: "+8613800000000" };
+
+/* ---------- 离线应急用语（中→英，本地预置，与鸿蒙版一致） ---------- */
+const PHRASES = [
+  { zh: "你好，我来自中国，我不懂英文。", en: "Hello, I'm from China and I don't speak English." },
+  { zh: "请帮我个忙，好吗？", en: "Could you please help me?" },
+  { zh: `我需要找到${CONTACT.name}。这是她的电话：${CONTACT.phone}，可以帮我打给她吗？`,
+    en: `I need to reach my family. This is the number: ${CONTACT.phone}. Could you please call for me?` },
+  { zh: "请帮我叫救护车！", en: "Please call an ambulance!" },
+  { zh: "请帮我打 911 报警/求救。", en: "Please call 911." },
+  { zh: "我身体很不舒服，需要看医生。", en: "I feel very sick. I need to see a doctor." },
+  { zh: "我对坚果和海鲜过敏，请不要给我吃。", en: "I'm allergic to tree nuts, peanuts and seafood. Please don't give me any." },
+  { zh: "我迷路了，请帮我看看怎么回酒店。", en: "I'm lost. Could you help me get back to my hotel?" },
+  { zh: "请问洗手间在哪里？", en: "Where is the restroom, please?" },
+  { zh: "请帮我联系中国驻当地领事馆。", en: "Please help me contact the Chinese consulate." },
+  { zh: "这个多少钱？", en: "How much is this?" },
+  { zh: "谢谢您！", en: "Thank you very much!" }
+];
+
+/* ---------- 演示词典（无后端时兜底，保证可验证） ---------- */
+const DEMO_ZH2EN = {
+  "洗手间在哪里": "Where is the restroom?",
+  "多少钱": "How much is it?",
+  "我要这个": "I would like this one.",
+  "谢谢": "Thank you.",
+  "帮我叫救护车": "Please call an ambulance."
+};
+const DEMO_EN2ZH = {
+  "your table will be ready in ten minutes": "您的桌子十分钟后就好。",
+  "how can i help you": "请问需要什么帮助？",
+  "that will be twenty five dollars": "一共二十五美元。"
+};
+
+/* ---------- 通用能力 ---------- */
+function speak(text, lang){
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang; u.rate = 0.9;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+async function translate(text, from, to){
+  text = (text||"").trim();
+  if(!text) return "";
+  if(GATEWAY_BASE){
+    try{
+      const r = await fetch(GATEWAY_BASE + "/translate", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ text, from, to })
+      });
+      const j = await r.json();
+      return j.targetText;
+    }catch(e){ /* 落到演示词典 */ }
+  }
+  const key = text.replace(/[，。！？,.!?\s]/g,"").toLowerCase();
+  const dict = from==="zh" ? DEMO_ZH2EN : DEMO_EN2ZH;
+  if(dict[key]) return dict[key];
+  return (to==="en")
+    ? `[演示] "${text}"（配置后端网关后显示真实英文译文）`
+    : `[演示]"${text}" 的中文译文（配置后端网关后显示真实译文）`;
+}
+function getRecognition(lang){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) return null;
+  const r = new SR(); r.lang = lang; r.interimResults = true; r.maxAlternatives = 1;
+  return r;
+}
+const secure = window.isSecureContext;
+
+/* ---------- 路由 ---------- */
+const app = document.getElementById("app");
+function go(name){ ({home,listen,speak:speakPage,photo,sos})[name](); }
+
+/* ---------- 首页 ---------- */
+function home(){
+  app.innerHTML = `
+    <div class="hint" style="font-size:var(--fz-title);font-weight:700;color:var(--text)">请选择</div>
+    <button class="card" style="background:var(--listen)" onclick="go('listen')">
+      <div class="ico">👂</div><div class="ttl">听</div><div class="sub">听别人说英文</div></button>
+    <button class="card" style="background:var(--speak)" onclick="go('speak')">
+      <div class="ico">🗣️</div><div class="ttl">说</div><div class="sub">我说中文给老外看</div></button>
+    <button class="card" style="background:var(--photo)" onclick="go('photo')">
+      <div class="ico">📷</div><div class="ttl">拍</div><div class="sub">拍英文给我看懂</div></button>
+    <button class="sos-entry" onclick="go('sos')">🆘 应急求助</button>
+    ${secure ? "" : `<div class="banner">提示：当前不是 HTTPS/localhost，麦克风和相机会受限。应急用语和朗读可正常用；要试"听/说/拍"请用 <b>localhost</b> 打开（见 README）。</div>`}
+  `;
+}
+
+/* ---------- 听：英文→中文 ---------- */
+function listen(){
+  app.innerHTML = `
+    <button class="topbar" style="background:var(--listen)" onclick="go('home')">⬅ 返回首页</button>
+    <div class="page">
+      <div class="hint" id="h">请把手机靠近对方，点下面的大圆钮开始听</div>
+      <div class="result" id="zh"></div>
+      <div class="small" id="en"></div>
+      <button class="mic" style="background:var(--listen)" id="mic">🎤 开始听</button>
+      <div class="row">
+        <button style="background:var(--listen);color:var(--on)" onclick="listen()">🔁 再听一句</button>
+        <button class="ghost" onclick="toggleBig('zh')">放大</button>
+      </div>
+    </div>`;
+  wireSpeechPage({ srcLang:"en-US", from:"en", to:"zh",
+    onResult: async (txt)=>{ document.getElementById("en").textContent=txt;
+      const zh = await translate(txt,"en","zh"); document.getElementById("zh").textContent=zh;
+      document.getElementById("h").textContent=""; speak(zh,"zh-CN"); } });
+}
+
+/* ---------- 说：中文→英文 ---------- */
+function speakPage(){
+  app.innerHTML = `
+    <button class="topbar" style="background:var(--speak)" onclick="go('home')">⬅ 返回首页</button>
+    <div class="page">
+      <div class="hint" id="h">点下面的钮，对我说中文</div>
+      <div class="small" id="zh"></div>
+      <div class="result" id="en"></div>
+      <button class="mic" style="background:var(--speak)" id="mic">🎤 我要说</button>
+      <button class="act hidden" style="background:var(--speak)" id="fsBtn">📺 全屏给对方看</button>
+      <div class="row">
+        <button class="ghost" onclick="reRead()">🔊 再读一遍</button>
+        <button style="background:var(--speak);color:var(--on)" onclick="speakPage()">🔁 重新说</button>
+      </div>
+    </div>`;
+  let lastEn = "", lastZh = "";
+  document.getElementById("fsBtn").onclick = ()=> openFs(lastZh, lastEn);
+  window.reRead = ()=>{ if(lastEn) speak(lastEn,"en-US"); };
+  wireSpeechPage({ srcLang:"zh-CN", from:"zh", to:"en",
+    onResult: async (txt)=>{ lastZh=txt; document.getElementById("zh").textContent=txt;
+      const en = await translate(txt,"zh","en"); lastEn=en;
+      document.getElementById("en").textContent=en; document.getElementById("h").textContent="";
+      document.getElementById("fsBtn").classList.remove("hidden"); speak(en,"en-US"); } });
+}
+
+/* 录音页通用逻辑 */
+function wireSpeechPage({srcLang, from, to, onResult}){
+  const mic = document.getElementById("mic"); const h = document.getElementById("h");
+  const rec = getRecognition(srcLang);
+  if(!rec){
+    h.textContent = "这个浏览器不支持语音，请用 Chrome，或改用「拍」「应急」。";
+  }
+  let recording = false;
+  mic.onclick = ()=>{
+    if(!rec){ return; }
+    if(recording){ rec.stop(); return; }
+    recording = true; mic.classList.add("rec"); mic.textContent="正在听…"; h.textContent="正在听…";
+    try{ rec.start(); }catch(e){}
+  };
+  if(rec){
+    rec.onresult = (ev)=>{
+      let txt=""; for(const r of ev.results) txt += r[0].transcript;
+      if(ev.results[ev.results.length-1].isFinal){ rec.stop(); onResult(txt.trim()); }
+    };
+    rec.onerror = ()=>{ h.textContent="没听清，请再说一次"; };
+    rec.onend = ()=>{ recording=false; mic.classList.remove("rec");
+      mic.textContent = (srcLang==="zh-CN") ? "🎤 我要说" : "🎤 开始听"; };
+  }
+}
+
+/* ---------- 拍：相机/选图 → OCR → 中文 ---------- */
+function photo(){
+  app.innerHTML = `
+    <button class="topbar" style="background:var(--photo)" onclick="stopCam();go('home')">⬅ 返回首页</button>
+    <div class="page">
+      <div class="hint" id="h">对准英文，点下面大钮拍照</div>
+      <div class="stage" id="stage"><video id="vid" playsinline autoplay muted></video></div>
+      <div class="result hidden" id="zh"></div>
+      <button class="act" style="background:var(--photo)" id="shot">📷 拍照</button>
+      <div class="row">
+        <button class="ghost" onclick="document.getElementById('file').click()">🖼️ 选已有照片</button>
+        <button class="ghost" onclick="speakResult()">🔊 朗读</button>
+      </div>
+      <input id="file" type="file" accept="image/*" class="hidden" />
+    </div>`;
+  startCam();
+  document.getElementById("shot").onclick = ()=> recognizeFromVideo();
+  document.getElementById("file").onchange = (e)=> recognizeFromFile(e.target.files[0]);
+}
+let camStream=null;
+async function startCam(){
+  if(!secure) { document.getElementById("h").textContent="非HTTPS无法开相机，请点「选已有照片」。"; return; }
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" } });
+    document.getElementById("vid").srcObject = camStream;
+  }catch(e){ document.getElementById("h").textContent="打不开相机，请点「选已有照片」。"; }
+}
+function stopCam(){ if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; } }
+async function recognizeFromVideo(){
+  const v=document.getElementById("vid");
+  if(!v.videoWidth){ recognizeFromFilePrompt(); return; }
+  const c=document.createElement("canvas"); c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext("2d").drawImage(v,0,0); showImage(c.toDataURL("image/jpeg"));
+  await doOcr(c.toDataURL("image/jpeg"));
+}
+function recognizeFromFile(file){ if(!file) return;
+  const fr=new FileReader(); fr.onload=async()=>{ showImage(fr.result); await doOcr(fr.result); }; fr.readAsDataURL(file);
+}
+function recognizeFromFilePrompt(){ document.getElementById("file").click(); }
+function showImage(dataUrl){ stopCam();
+  document.getElementById("stage").innerHTML = `<img src="${dataUrl}"/>`; }
+async function doOcr(dataUrl){
+  const h=document.getElementById("h"); h.textContent="正在识别…";
+  let fullText="";
+  if(GATEWAY_BASE){
+    try{ const r=await fetch(GATEWAY_BASE+"/ocr",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({imageBase64:dataUrl.split(",")[1]})}); const j=await r.json(); fullText=j.fullText; }catch(e){}
+  }
+  const zhEl=document.getElementById("zh"); zhEl.classList.remove("hidden");
+  if(!fullText){ zhEl.textContent="[演示] 识别到的英文译文会显示在这里（需配置后端 OCR 网关）。";
+    h.textContent=""; return; }
+  const zh=await translate(fullText,"en","zh"); zhEl.textContent=zh; h.textContent=""; speak(zh,"zh-CN");
+}
+function speakResult(){ const t=document.getElementById("zh").textContent; if(t) speak(t,"zh-CN"); }
+
+/* ---------- 应急（离线） ---------- */
+function sos(){
+  app.innerHTML = `
+    <button class="topbar" style="background:var(--sos)" onclick="go('home')">⬅ 返回首页</button>
+    <div class="page">
+      <div class="contact">
+        <div class="nm">联系${CONTACT.name}</div>
+        <div class="ph">${CONTACT.phone}</div>
+        <a class="act" style="background:#fff;color:var(--sos);display:flex;align-items:center;justify-content:center;text-decoration:none;border-radius:var(--radius)"
+           href="tel:${CONTACT.phone}">📞 一键拨打</a>
+      </div>
+      <div class="hint">点一句话，给身边的人看（可离线朗读）</div>
+      <div id="list" style="display:flex;flex-direction:column;gap:var(--gap);overflow:auto;flex:1"></div>
+    </div>`;
+  const list=document.getElementById("list");
+  PHRASES.forEach(p=>{
+    const b=document.createElement("button"); b.className="phrase"; b.textContent=p.zh;
+    b.onclick=()=>{ openFs(p.zh,p.en); speak(p.en,"en-US"); };
+    list.appendChild(b);
+  });
+}
+
+/* ---------- 全屏给对方看 ---------- */
+function openFs(zh,en){ document.getElementById("fsZh").textContent=zh;
+  document.getElementById("fsEn").textContent=en;
+  document.getElementById("fs").classList.remove("hidden"); }
+function closeFs(){ document.getElementById("fs").classList.add("hidden"); }
+function toggleBig(id){ document.getElementById(id).classList.toggle("big"); }
+
+home();
+</script>
+</body>
+</html>
