@@ -1,0 +1,11 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "长辈翻译主模块" },
+    { "name": "ability_desc", "value": "长辈翻译" },
+    { "name": "app_name", "value": "长辈翻译" },
+    { "name": "reason_internet", "value": "联网才能把语音和图片翻译给您看" },
+    { "name": "reason_microphone", "value": "需要听您说话或对方说话来翻译" },
+    { "name": "reason_camera", "value": "需要拍照来识别英文" },
+    { "name": "reason_call", "value": "紧急时帮您拨打家人电话" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#FFFFFF" },
+    { "name": "bg", "value": "#FFFFFF" },
+    { "name": "text_main", "value": "#1A1A1A" },
+    { "name": "listen_green", "value": "#1B8A3A" },
+    { "name": "speak_blue", "value": "#1361C2" },
+    { "name": "photo_orange", "value": "#D5670B" },
+    { "name": "emergency_red", "value": "#C0271A" }
+  ]
+}

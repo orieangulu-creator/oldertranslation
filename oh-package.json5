@@ -1,0 +1,7 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "eldertranslate",
+  "version": "1.0.0",
+  "description": "给60岁以上不懂英文长辈使用的中英翻译App（鸿蒙）",
+  "dependencies": {}
+}
