@@ -85,7 +85,12 @@
    ============================================================ */
 
 /* ---------- 配置 ---------- */
-const GATEWAY_BASE = ""; // 部署后填：如 "https://gateway.example.com"，留空则走演示词典
+// 网关地址：优先用 URL 的 ?gateway=，记住到 localStorage；都没有则走演示词典兜底
+const GATEWAY_BASE = (() => {
+  const q = new URLSearchParams(location.search).get("gateway");
+  if (q !== null) { try { localStorage.setItem("gateway", q); } catch(e){} return q; }
+  try { return localStorage.getItem("gateway") || ""; } catch(e){ return ""; }
+})();
 
 /* ---------- 家人紧急联系人（子女填写） ---------- */
 const CONTACT = { name: "我的女儿", phone: "+8613800000000" };
@@ -143,9 +148,10 @@ async function translate(text, from, to){
       return j.targetText;
     }catch(e){ /* 落到演示词典 */ }
   }
-  const key = text.replace(/[，。！？,.!?\s]/g,"").toLowerCase();
-  const dict = from==="zh" ? DEMO_ZH2EN : DEMO_EN2ZH;
-  if(dict[key]) return dict[key];
+  const norm = (s)=> s.replace(/[，。！？,.!?\s]/g,"").toLowerCase();
+  const buildNorm = (d)=>{ const o={}; for(const k in d) o[norm(k)]=d[k]; return o; };
+  const dict = from==="zh" ? buildNorm(DEMO_ZH2EN) : buildNorm(DEMO_EN2ZH);
+  if(dict[norm(text)]) return dict[norm(text)];
   return (to==="en")
     ? `[演示] "${text}"（配置后端网关后显示真实英文译文）`
     : `[演示]"${text}" 的中文译文（配置后端网关后显示真实译文）`;

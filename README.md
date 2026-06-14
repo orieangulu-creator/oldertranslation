@@ -53,7 +53,15 @@ tests/                            测试用例、翻译语料、校对报告
 - 相机/麦克风需 **HTTPS 或 localhost**（不是相机不支持网页，而是浏览器的安全环境要求）。
 - 快速试：`cd web && python3 -m http.server 8080` → 打开 `http://localhost:8080`。详见 `web/README.md`。
 
+## 后端网关（让翻译/OCR 真正可用）
+
+`server/gateway.js` 是零依赖的 Node 网关：客户端只连它，**密钥保存在服务端**。
+- 配了 Azure 密钥走真实云端；没配则自动 **Mock 模式**，便于本地跑通整条链路。
+- 配合网页版：`cd server && node gateway.js`，再开 `http://localhost:8080/?gateway=http://localhost:3000`。
+- 详见 `server/README.md`。
+
 ## 相关文档
 - 产品计划（PRD）：`docs/产品计划.md`
 - 测试与校对报告：`tests/`
 - 网页版说明：`web/README.md`
+- 后端网关说明：`server/README.md`

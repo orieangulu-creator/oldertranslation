@@ -1,0 +1,13 @@
+{
+  "name": "eldertranslate-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "长辈翻译后端网关：代理 Azure 翻译/OCR，密钥不入客户端（含 Mock 模式）",
+  "main": "gateway.js",
+  "scripts": {
+    "start": "node gateway.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
