@@ -2,10 +2,16 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#ffffff" />
 <title>长辈翻译</title>
 <link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+<link rel="apple-touch-icon" href="icons/icon.svg" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="长辈翻译" />
 <style>
   :root{
     --bg:#fff; --text:#1a1a1a; --sub:#5a5a5a; --card:#f4f6f8;
@@ -17,7 +23,14 @@
   html,body{margin:0; height:100%;}
   body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
     background:var(--bg); color:var(--text); font-size:var(--fz-hint);}
-  .app{max-width:520px; margin:0 auto; min-height:100%; padding:20px; display:flex; flex-direction:column; gap:var(--gap);}
+  .app{max-width:520px; margin:0 auto; min-height:100%; display:flex; flex-direction:column; gap:var(--gap);
+    padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));}
+  button:active,.phrase:active,.card:active{filter:brightness(.92); transform:scale(.99);}
+  /* 安装到桌面 / 离线提示 */
+  .install{width:100%; height:72px; font-size:var(--fz-btn); font-weight:700; color:var(--on);
+    background:#333; display:flex; align-items:center; justify-content:center; gap:10px;}
+  .offline{font-size:16px; color:#7a3a00; background:#fff3cd; border:1px solid #ffe08a;
+    border-radius:12px; padding:8px 12px; text-align:center;}
   .hidden{display:none !important;}
   button{font-family:inherit; border:none; border-radius:var(--radius); cursor:pointer;}
   .topbar{width:100%; height:84px; font-size:var(--fz-btn); color:var(--on); font-weight:700;}
@@ -47,7 +60,8 @@
   .contact .nm{font-size:var(--fz-title); font-weight:700;} .contact .ph{font-size:var(--fz-hint);}
   .phrase{width:100%; padding:18px; background:var(--card); border-radius:var(--radius); font-size:var(--fz-btn); text-align:left; color:var(--text);}
   /* 全屏给对方看 */
-  .fs{position:fixed; inset:0; background:#000; color:#fff; display:flex; flex-direction:column; padding:20px; gap:var(--gap); z-index:50;}
+  .fs{position:fixed; inset:0; background:#000; color:#fff; display:flex; flex-direction:column; gap:var(--gap); z-index:50;
+    padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));}
   .fs .big{flex:1; display:flex; align-items:center; justify-content:center; text-align:center; font-size:var(--fz-result-big); font-weight:700;}
   .fs .zh{font-size:var(--fz-hint); color:#ccc; text-align:center;}
   .banner{font-size:15px; color:#8a5a00; background:#fff7e6; border:1px solid #ffe0a3; border-radius:12px; padding:10px 12px;}
@@ -151,6 +165,7 @@ function go(name){ ({home,listen,speak:speakPage,photo,sos})[name](); }
 /* ---------- 首页 ---------- */
 function home(){
   app.innerHTML = `
+    <div id="offline" class="offline ${navigator.onLine ? 'hidden' : ''}">📴 当前没有网络：应急用语和朗读仍可使用</div>
     <div class="hint" style="font-size:var(--fz-title);font-weight:700;color:var(--text)">请选择</div>
     <button class="card" style="background:var(--listen)" onclick="go('listen')">
       <div class="ico">👂</div><div class="ttl">听</div><div class="sub">听别人说英文</div></button>
@@ -159,8 +174,10 @@ function home(){
     <button class="card" style="background:var(--photo)" onclick="go('photo')">
       <div class="ico">📷</div><div class="ttl">拍</div><div class="sub">拍英文给我看懂</div></button>
     <button class="sos-entry" onclick="go('sos')">🆘 应急求助</button>
+    <button id="installBtn" class="install ${deferredPrompt ? '' : 'hidden'}" onclick="doInstall()">📲 添加到桌面</button>
     ${secure ? "" : `<div class="banner">提示：当前不是 HTTPS/localhost，麦克风和相机会受限。应急用语和朗读可正常用；要试"听/说/拍"请用 <b>localhost</b> 打开（见 README）。</div>`}
   `;
+  guideOnce();
 }
 
 /* ---------- 听：英文→中文 ---------- */
@@ -316,6 +333,47 @@ function openFs(zh,en){ document.getElementById("fsZh").textContent=zh;
   document.getElementById("fs").classList.remove("hidden"); }
 function closeFs(){ document.getElementById("fs").classList.add("hidden"); }
 function toggleBig(id){ document.getElementById(id).classList.toggle("big"); }
+
+/* ---------- PWA：离线缓存 / 安装到桌面 / 反馈 / 语音引导 ---------- */
+// 注册 Service Worker（仅安全环境有效；file:// 会静默跳过）
+if("serviceWorker" in navigator && secure){
+  window.addEventListener("load", ()=> navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+
+// 安装到桌面
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", (e)=>{
+  e.preventDefault(); deferredPrompt = e;
+  const b = document.getElementById("installBtn"); if(b) b.classList.remove("hidden");
+});
+async function doInstall(){
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null;
+  const b = document.getElementById("installBtn"); if(b) b.classList.add("hidden");
+}
+window.addEventListener("appinstalled", ()=>{ deferredPrompt=null; });
+
+// 在线/离线提示（回首页时刷新）
+function refreshOffline(){
+  const el = document.getElementById("offline");
+  if(el) el.classList.toggle("hidden", navigator.onLine);
+}
+window.addEventListener("online", refreshOffline);
+window.addEventListener("offline", refreshOffline);
+
+// 触控反馈：轻震动（适老化三重反馈之一，详见 PRD 第 6 节）
+document.addEventListener("click", (e)=>{
+  if(e.target.closest("button,.phrase,.card,a")){ try{ navigator.vibrate && navigator.vibrate(15); }catch(_){} }
+}, true);
+
+// 首页语音引导（浏览器需用户先有交互，故首次点击后再播报一次）
+let guided = false;
+function guideOnce(){
+  if(guided) return;
+  const fire = ()=>{ if(!guided){ guided = true; speak("请选择，听、说、还是拍。", "zh-CN"); }
+    document.removeEventListener("pointerdown", fire); };
+  document.addEventListener("pointerdown", fire, { once:true });
+}
 
 home();
 </script>

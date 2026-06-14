@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b8a3a"/>
+      <stop offset="1" stop-color="#1361c2"/>
+    </linearGradient>
+  </defs>
+  <!-- 背景留出 maskable 安全边 -->
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <!-- 对话气泡 -->
+  <rect x="96" y="120" width="320" height="220" rx="48" fill="#ffffff"/>
+  <path d="M196 340 L196 404 L260 340 Z" fill="#ffffff"/>
+  <!-- 中 ⇄ EN -->
+  <text x="186" y="252" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="120" font-weight="700" fill="#1a1a1a" text-anchor="middle">中</text>
+  <text x="256" y="248" font-family="sans-serif" font-size="84" font-weight="700" fill="#d5670b" text-anchor="middle">⇄</text>
+  <text x="346" y="246" font-family="Arial, sans-serif" font-size="78" font-weight="700" fill="#1a1a1a" text-anchor="middle">EN</text>
+</svg>

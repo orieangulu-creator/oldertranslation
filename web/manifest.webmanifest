@@ -2,9 +2,20 @@
   "name": "长辈翻译",
   "short_name": "长辈翻译",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "lang": "zh-CN",
-  "description": "给60岁以上不懂英文长辈使用的中英翻译（听/说/拍/应急）"
+  "description": "给60岁以上不懂英文长辈使用的中英翻译（听/说/拍/应急）",
+  "categories": ["travel", "utilities"],
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
